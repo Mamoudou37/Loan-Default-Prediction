@@ -1,0 +1,118 @@
+# Importing the required libraries
+from bs4 import BeautifulSoup
+import requests
+import pandas as pd
+import numpy as np
+import sqlite3
+from datetime import datetime 
+
+from datetime import datetime
+
+def log_progress(message):
+    ''' 
+    This function logs the specified progress message to the file code_log.txt.
+    The message is logged with a timestamp to indicate the time of the event.
+    '''
+    # Timestamp format
+    timestamp_format = '%Y-%m-%d %H:%M:%S'  # Year-Month-Day Hour:Minute:Second
+    
+    # Get the current time
+    now = datetime.now()
+    
+    # Format the timestamp
+    timestamp = now.strftime(timestamp_format)
+    
+    # Log the message with the timestamp to the file code_log.txt
+    with open("code_log.txt", "a") as log_file:
+        log_file.write(f"{timestamp} - {message}\n")
+
+def extract(url, table_attribs):
+    ''' This function extracts the required information
+    from the website and stores it in a dataframe.
+    The function returns the dataframe for further processing. '''
+    
+    # Download the content of the webpage as text
+    page = requests.get(url).text
+    
+    # Parse the webpage content with BeautifulSoup
+    data = BeautifulSoup(page, 'html.parser')
+    
+    # Create an empty dataframe with the specified columns
+    df = pd.DataFrame(columns=table_attribs)
+    
+    # Extract all <tbody> tags from the page
+    tables = data.find_all('tbody')
+    
+    # Extract all rows from the table located at index 2
+    rows = tables[1].find_all('tr')
+    
+    # Loop through each row in the table
+    for row in rows:
+        # Extract all columns from the row
+        col = row.find_all('td')
+        
+        # Check if the row is not empty
+        if len(col) != 0:
+            # Check if the first column contains a hyperlink and the third column is not '—'
+            if col[0].find('a') is not None and '—' not in col[1]:
+                # Create a dictionary with the extracted data
+                data_dict = {"Name": col[0].a.contents[0],
+                             "MC_USD_Billion": col[1].contents[0]}
+                
+                # Convert the dictionary into a temporary dataframe
+                df1 = pd.DataFrame(data_dict, index=[0])
+                
+                # Concatenate the temporary dataframe with the main dataframe
+                df = pd.concat([df, df1], ignore_index=True)
+    
+    # Return the final dataframe containing the extracted data
+    return df
+
+import pandas as pd
+import numpy as np
+
+def transform(df, csv_path):
+    ''' 
+    This function accesses the CSV file for exchange rate information, 
+    and adds three columns to the dataframe, each containing the transformed 
+    version of Market Cap column to respective currencies.
+    '''
+    # Read the exchange rate data from the CSV file and convert to a dictionary
+    exchange_rates = pd.read_csv(csv_path)
+    exchange_rate_dict = exchange_rates.set_index('Currency').to_dict()['Rate']
+        # Convert 'MC_USD_Billion' column to float after cleaning (removing commas if present)
+    df['MC_USD_Billion'] = df['MC_USD_Billion'].str.replace(',', '').astype(float)
+    
+    # Create new columns for GBP, EUR, and INR with values rounded to 2 decimal places
+    df['MC_GBP_Billion'] = [np.round(x * exchange_rate_dict['GBP'], 2) for x in df['MC_USD_Billion']]
+    df['MC_EUR_Billion'] = [np.round(x * exchange_rate_dict['EUR'], 2) for x in df['MC_USD_Billion']]
+    df['MC_INR_Billion'] = [np.round(x * exchange_rate_dict['INR'], 2) for x in df['MC_USD_Billion']]
+    
+    # Return the updated dataframe
+    return df
+
+url='https://en.wikipedia.org/wiki/List_of_largest_banks'    
+table_attribs=['Name', 'MC_USD_Billion', 'MC_GBP_Billion', 'MC_EUR_Billion', 'MC_INR_Billion']
+
+# Download the CSV file with wget on the terminal: wget https://cf-courses-data.s3.us.cloud-object-storage.appdomain.cloud/IBMSkillsNetwork-PY0221EN-Coursera/labs/v2/exchange_rate.csv -O exchange_rate.csv
+
+csv_path = 'exchange_rate.csv'  # Local file after downloading
+
+log_progress('Premilinaries complete. Initiating ETL process')
+
+df=extract(url, table_attribs)
+
+log_progress('Data extration complete. Initiating Transformation process')
+
+transformed_df = transform(df, csv_path)
+
+log_progress('Data Transformation complete. Initiating printing process')
+
+# Print the transformed dataframe
+print(transformed_df)
+# Print the market capitalization of the 5th largest bank in billion EUR (index 4)
+print(f"Market capitalization of the 5th largest bank in EUR: {transformed_df['MC_EUR_Billion'][4]}")
+
+# Logging the transformation process
+log_progress("Data transformation completed, added MC_GBP_Billion, MC_EUR_Billion, and MC_INR_Billion columns.")
+
