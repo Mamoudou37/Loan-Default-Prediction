@@ -1,0 +1,2 @@
+# Loan default prediction
+The loan approval process is a major concern for banks. Banks put effort into checking creditworthiness to avoid bad debts, but the process is prone to misjudgments. With data science and machine learning, the focus has shifted to building machines that make the approval process bias-free and efficient. The goal of the project is to build a model that predicts loan defaults and advises banks on key variables to consider.
